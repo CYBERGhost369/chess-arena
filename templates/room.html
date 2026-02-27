@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChessArena — Room {{ room_code }}</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+<style>
+  :root {
+    --ink: #0d0d0d;
+    --cream: #f5f0e8;
+    --gold: #c9a84c;
+    --gold-light: #e8c97a;
+    --green: #4caf7d;
+    --red: #e05757;
+    --border: rgba(201,168,76,0.2);
+    --muted: rgba(245,240,232,0.4);
+    --panel: rgba(255,255,255,0.03);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--ink);
+    color: var(--cream);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+  }
+
+  nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.85rem 2rem;
+    border-bottom: 1px solid var(--border);
+    background: rgba(0,0,0,0.4);
+    backdrop-filter: blur(10px);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .nav-brand {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.2rem;
+    font-weight: 900;
+    background: linear-gradient(135deg, var(--gold-light), var(--gold));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-decoration: none;
+  }
+
+  .room-code-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(201,168,76,0.1);
+    border: 1px solid var(--border);
+    padding: 0.4rem 1rem;
+    border-radius: 2px;
+    font-size: 0.75rem;
+  }
+
+  .room-code-badge .code {
+    color: var(--gold);
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    font-size: 1rem;
+  }
+
+  .main {
+    display: grid;
+    grid-template-columns: 280px 1fr 300px;
+    height: calc(100vh - 57px);
+    overflow: hidden;
+  }
+
+  @media (max-width: 900px) {
+    .main { grid-template-columns: 1fr; height: auto; overflow: auto; }
+    .sidebar, .bracket-panel { max-height: 300px; }
+  }
+
+  .sidebar {
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .bracket-panel {
+    border-left: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 1.5rem;
+  }
+
+  .panel-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--gold);
+    letter-spacing: 0.05em;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .player-card {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 2px;
+    margin-bottom: 0.5rem;
+    transition: border-color 0.2s;
+    cursor: pointer;
+  }
+
+  .player-card:hover {
+    border-color: rgba(201,168,76,0.3);
+  }
+
+  .player-card.is-me {
+    border-color: rgba(201,168,76,0.4);
+    background: rgba(201,168,76,0.05);
+  }
+
+  .player-avatar {
+    width: 36px;
+    height: 36px;
+    background: rgba(201,168,76,0.15);
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+  }
+
+  .player-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .player-name {
+    font-size: 0.85rem;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .player-elo {
+    font-size: 0.65rem;
+    color: var(--muted);
+  }
+
+  .player-badge {
+    font-size: 0.6rem;
+    letter-spacing: 0.1em;
+    padding: 0.2rem 0.4rem;
+    border-radius: 1px;
+  }
+
+  .badge-admin {
+    background: rgba(201,168,76,0.2);
+    color: var(--gold);
+    border: 1px solid rgba(201,168,76,0.3);
+  }
+
+  .center-panel {
+    overflow-y: auto;
+    padding: 1.5rem 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .section-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 1.5rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .section-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  }
+
+  .section-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+  }
+
+  .time-options {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .time-btn {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: var(--cream);
+    padding: 0.65rem 0.5rem;
+    border-radius: 2px;
+    cursor: pointer;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.78rem;
+    transition: all 0.2s;
+    text-align: center;
+  }
+
+  .time-btn:hover { border-color: var(--gold); color: var(--gold); }
+  .time-btn.selected { background: rgba(201,168,76,0.15); border-color: var(--gold); color: var(--gold); }
+
+  .custom-time-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  input[type="number"] {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: var(--cream);
+    padding: 0.5rem 0.75rem;
+    border-radius: 2px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.8rem;
+    width: 90px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  input[type="number"]:focus { border-color: var(--gold); }
+
+  .btn {
+    padding: 0.6rem 1.2rem;
+    border-radius: 2px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+    text-transform: uppercase;
+  }
+
+  .btn-gold { background: var(--gold); color: var(--ink); }
+  .btn-gold:hover { background: var(--gold-light); transform: translateY(-1px); box-shadow: 0 4px 20px rgba(201,168,76,0.3); }
+  .btn-gold:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+  .btn-outline:hover { border-color: var(--gold); color: var(--gold); }
+
+  .btn-green { background: rgba(76,175,125,0.2); border: 1px solid rgba(76,175,125,0.4); color: var(--green); }
+  .btn-green:hover { background: rgba(76,175,125,0.35); }
+
+  .btn-red { background: rgba(224,87,87,0.2); border: 1px solid rgba(224,87,87,0.4); color: var(--red); }
+  .btn-red:hover { background: rgba(224,87,87,0.35); }
+
+  .btn-sm { padding: 0.35rem 0.7rem; font-size: 0.65rem; }
+
+  /* Opponent selector */
+  .opponent-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .opp-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 2px;
+    transition: border-color 0.2s;
+  }
+
+  .opp-row:hover { border-color: rgba(201,168,76,0.3); }
+
+  /* Incoming request */
+  .request-toast {
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    background: #1a1a0e;
+    border: 1px solid var(--gold);
+    border-radius: 2px;
+    padding: 1.25rem 1.5rem;
+    z-index: 999;
+    min-width: 280px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+    display: none;
+    animation: slideIn 0.3s ease;
+  }
+
+  @keyframes slideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+
+  .request-title { font-family: 'Playfair Display', serif; font-size: 1rem; margin-bottom: 0.5rem; }
+  .request-sub { font-size: 0.75rem; color: var(--muted); margin-bottom: 1rem; }
+  .request-btns { display: flex; gap: 0.75rem; }
+
+  /* Chat */
+  .chat-box {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 2px;
+    display: flex;
+    flex-direction: column;
+    height: 200px;
+  }
+
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .chat-msg {
+    font-size: 0.75rem;
+  }
+
+  .chat-msg .author { color: var(--gold); }
+  .chat-msg .text { color: var(--muted); }
+
+  .chat-input-row {
+    display: flex;
+    border-top: 1px solid rgba(255,255,255,0.06);
+  }
+
+  .chat-input-row input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    padding: 0.6rem 0.75rem;
+    color: var(--cream);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.78rem;
+    outline: none;
+  }
+
+  .chat-send {
+    background: transparent;
+    border: none;
+    border-left: 1px solid rgba(255,255,255,0.06);
+    color: var(--gold);
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+    transition: background 0.2s;
+    font-size: 0.8rem;
+  }
+
+  .chat-send:hover { background: rgba(201,168,76,0.1); }
+
+  /* Bracket */
+  .bracket-match {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 2px;
+    margin-bottom: 0.75rem;
+    overflow: hidden;
+  }
+
+  .bracket-round {
+    font-size: 0.6rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--gold);
+    padding: 0.4rem 0.75rem;
+    background: rgba(201,168,76,0.08);
+    border-bottom: 1px solid rgba(201,168,76,0.15);
+  }
+
+  .bracket-player {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.6rem 0.75rem;
+    font-size: 0.8rem;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+
+  .bracket-player:last-child { border-bottom: none; }
+  .bracket-player.winner { color: var(--gold); font-weight: 700; }
+  .bracket-player.loser { color: var(--muted); }
+
+  .winner-crown { font-size: 0.8rem; }
+
+  /* Toast notifications */
+  .toast {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(30,25,15,0.95);
+    border: 1px solid var(--gold);
+    color: var(--cream);
+    padding: 0.85rem 1.5rem;
+    border-radius: 2px;
+    font-size: 0.82rem;
+    z-index: 999;
+    display: none;
+    animation: toastIn 0.3s ease;
+  }
+
+  @keyframes toastIn {
+    from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+
+  .status-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: rgba(0,0,0,0.3);
+    border-radius: 2px;
+    font-size: 0.72rem;
+    color: var(--muted);
+  }
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+    animation: pulse 2s infinite;
+    flex-shrink: 0;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .match-redirect-banner {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    display: none;
+  }
+
+  .match-redirect-content {
+    background: #1a1410;
+    border: 2px solid var(--gold);
+    padding: 2.5rem 3rem;
+    border-radius: 2px;
+    text-align: center;
+  }
+
+  .match-redirect-content h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.8rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .match-redirect-content p {
+    color: var(--muted);
+    margin-bottom: 1.5rem;
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="/lobby" class="nav-brand">♛ ChessArena</a>
+  <div class="room-code-badge">
+    Room Code: <span class="code">{{ room_code }}</span>
+    <button class="btn btn-outline" style="padding:0.3rem 0.6rem; font-size:0.65rem;" onclick="copyCode()">Copy</button>
+  </div>
+  <span style="font-size:0.75rem; color:var(--muted);">{{ username }}</span>
+</nav>
+
+<div class="main">
+  <!-- Left Sidebar: Players -->
+  <div class="sidebar">
+    <div>
+      <div class="panel-title">
+        Players
+        <span id="playerCount" style="font-size:0.7rem; color:var(--muted);">0 / 10</span>
+      </div>
+      <div id="playerList"></div>
+    </div>
+
+    <div>
+      <div class="panel-title">Chat</div>
+      <div class="chat-box">
+        <div class="chat-messages" id="chatMessages"></div>
+        <div class="chat-input-row">
+          <input type="text" id="chatInput" placeholder="Say something..." maxlength="200">
+          <button class="chat-send" onclick="sendChat()">→</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Center: Controls -->
+  <div class="center-panel">
+    <div class="section-card">
+      <div class="section-title">⏱ Time Control</div>
+      <div class="time-options">
+        <button class="time-btn" onclick="selectTime(60, this)">1 min</button>
+        <button class="time-btn selected" onclick="selectTime(180, this)">3 min</button>
+        <button class="time-btn" onclick="selectTime(300, this)">5 min</button>
+        <button class="time-btn" onclick="selectTime(600, this)">10 min</button>
+      </div>
+      <div class="custom-time-row">
+        <input type="number" id="customTime" placeholder="Custom (secs)" min="30" max="3600">
+        <button class="btn btn-outline" onclick="setCustomTime()">Set Custom</button>
+      </div>
+    </div>
+
+    <div class="section-card" id="adminPanel" style="display:none;">
+      <div class="section-title">👑 Admin Controls</div>
+      <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
+        <button class="btn btn-gold" id="startBtn" onclick="startTournament()">
+          🏆 Start Tournament
+        </button>
+        <button class="btn btn-outline" onclick="forceNextRound()">
+          ⏭ Force Next Round
+        </button>
+      </div>
+      <div style="margin-top:1rem; font-size:0.7rem; color:var(--muted);">
+        Need 2–10 players to start. Players who join after start won't participate.
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-title">⚔ Challenge a Player</div>
+      <div id="opponentList" class="opponent-list">
+        <div style="color:var(--muted); font-size:0.8rem;">Waiting for players to join...</div>
+      </div>
+    </div>
+
+    <div class="section-card" id="statusCard">
+      <div class="section-title">📊 Tournament Status</div>
+      <div id="tournamentStatus">
+        <div class="status-bar">
+          <div class="status-dot"></div>
+          Waiting for admin to start tournament...
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: Bracket -->
+  <div class="bracket-panel">
+    <div class="panel-title">🏆 Bracket</div>
+    <div id="bracketView">
+      <div style="color:var(--muted); font-size:0.78rem;">Bracket will appear when tournament starts.</div>
+    </div>
+  </div>
+</div>
+
+<!-- Incoming request toast -->
+<div class="request-toast" id="requestToast">
+  <div class="request-title">⚔ Match Request!</div>
+  <div class="request-sub" id="requestSub"></div>
+  <div class="request-btns">
+    <button class="btn btn-green" onclick="respondRequest(true)">Accept</button>
+    <button class="btn btn-red" onclick="respondRequest(false)">Decline</button>
+  </div>
+</div>
+
+<!-- Match start overlay -->
+<div class="match-redirect-banner" id="matchRedirect">
+  <div class="match-redirect-content">
+    <h2>⚔ Match Starting!</h2>
+    <p id="matchInfo">Loading...</p>
+    <button class="btn btn-gold" id="goToMatch">Go to Match →</button>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+const ROOM_CODE = '{{ room_code }}';
+const ME = '{{ username }}';
+let selectedTime = 180;
+let isAdmin = false;
+let pendingRequest = null;
+let currentMatchId = null;
+
+const socket = io();
+
+socket.on('connect', () => {
+  socket.emit('join_room_socket', {room_code: ROOM_CODE});
+});
+
+socket.on('joined_room', (data) => {
+  isAdmin = data.is_admin;
+  if (isAdmin) {
+    document.getElementById('adminPanel').style.display = 'block';
+  }
+});
+
+socket.on('room_update', (data) => {
+  renderPlayers(data.players, data.admin);
+  if (data.status === 'active') {
+    document.getElementById('startBtn') && (document.getElementById('startBtn').disabled = true);
+  }
+});
+
+socket.on('player_left', (data) => {
+  showToast(`${data.username} left the room`);
+});
+
+socket.on('chat_message', (data) => {
+  addChatMessage(data.username, data.message);
+});
+
+socket.on('match_request_received', (data) => {
+  pendingRequest = data;
+  const sub = document.getElementById('requestSub');
+  const mins = Math.floor(data.time_control / 60);
+  const secs = data.time_control % 60;
+  const timeStr = secs ? `${mins}m ${secs}s` : `${mins} min`;
+  sub.textContent = `${data.from} challenges you! Time: ${timeStr}`;
+  document.getElementById('requestToast').style.display = 'block';
+  
+  // Auto-decline after 30s
+  setTimeout(() => {
+    if (pendingRequest) {
+      respondRequest(false);
+    }
+  }, 30000);
+});
+
+socket.on('match_request_declined', (data) => {
+  showToast(`${data.by} declined your request`);
+});
+
+socket.on('match_started', (data) => {
+  currentMatchId = data.match_id;
+  const banner = document.getElementById('matchRedirect');
+  const info = document.getElementById('matchInfo');
+  const btn = document.getElementById('goToMatch');
+  
+  const color = data.color === 'white' ? '⬜ White' : '⬛ Black';
+  info.textContent = `You play ${color} vs ${data.color === 'white' ? data.black : data.white}`;
+  btn.onclick = () => window.location.href = '/match/' + data.match_id;
+  banner.style.display = 'flex';
+  
+  // Auto-redirect after 3s
+  setTimeout(() => {
+    window.location.href = '/match/' + data.match_id;
+  }, 3000);
+});
+
+socket.on('tournament_started', (data) => {
+  showToast('🏆 ' + data.message);
+  renderBracket(data.bracket, data.round_name);
+  document.getElementById('tournamentStatus').innerHTML = `
+    <div class="status-bar">
+      <div class="status-dot"></div>
+      <strong>${data.round_name}</strong> in progress
+    </div>
+  `;
+});
+
+socket.on('new_round', (data) => {
+  showToast('🎯 ' + data.message);
+  renderBracket(data.bracket, data.round_name);
+  document.getElementById('tournamentStatus').innerHTML = `
+    <div class="status-bar">
+      <div class="status-dot"></div>
+      <strong>${data.round_name}</strong> started
+    </div>
+  `;
+});
+
+socket.on('match_result', (data) => {
+  const resultText = data.result === 'draw' ? 'Draw!' : `${data.winner} wins by ${data.result}`;
+  showToast(`⚔ ${data.white} vs ${data.black}: ${resultText}`);
+});
+
+socket.on('tournament_complete', (data) => {
+  showToast(data.message, 8000);
+  document.getElementById('tournamentStatus').innerHTML = `
+    <div style="text-align:center; padding: 1rem;">
+      <div style="font-size:2rem; margin-bottom:0.5rem;">🏆</div>
+      <div style="font-family:'Playfair Display',serif; font-size:1.2rem; color:var(--gold);">${data.winner}</div>
+      <div style="color:var(--muted); font-size:0.75rem; margin-top:0.25rem;">Tournament Champion</div>
+    </div>
+  `;
+});
+
+socket.on('leaderboard_update', (data) => {
+  renderBracket(data.bracket, data.current_round);
+});
+
+socket.on('kicked', () => {
+  alert('You were removed from this room by the admin.');
+  window.location.href = '/lobby';
+});
+
+socket.on('error', (data) => {
+  showToast('⚠ ' + data.message);
+});
+
+// ============= RENDER FUNCTIONS =============
+
+function renderPlayers(players, admin) {
+  const list = document.getElementById('playerList');
+  const count = document.getElementById('playerCount');
+  count.textContent = `${players.length} / 10`;
+  
+  list.innerHTML = '';
+  players.forEach(p => {
+    const isMe = p.username === ME;
+    const isAdm = p.username === admin;
+    const div = document.createElement('div');
+    div.className = `player-card ${isMe ? 'is-me' : ''}`;
+    div.innerHTML = `
+      <div class="player-avatar">♟</div>
+      <div class="player-info">
+        <div class="player-name">${p.username}${isMe ? ' (you)' : ''}</div>
+        <div class="player-elo">ELO: ${p.elo_rating} · W${p.total_wins}/L${p.total_losses}</div>
+      </div>
+      ${isAdm ? '<span class="player-badge badge-admin">Admin</span>' : ''}
+    `;
+    list.appendChild(div);
+  });
+
+  // Render opponent list
+  const oppList = document.getElementById('opponentList');
+  const opponents = players.filter(p => p.username !== ME);
+  
+  if (opponents.length === 0) {
+    oppList.innerHTML = '<div style="color:var(--muted); font-size:0.8rem;">No other players yet...</div>';
+    return;
+  }
+
+  oppList.innerHTML = '';
+  opponents.forEach(p => {
+    const row = document.createElement('div');
+    row.className = 'opp-row';
+    row.innerHTML = `
+      <div style="font-size:0.85rem;">${p.username} <span style="color:var(--muted); font-size:0.7rem;">ELO: ${p.elo_rating}</span></div>
+      <button class="btn btn-outline btn-sm" onclick="challengePlayer('${p.username}')">⚔ Challenge</button>
+    `;
+    oppList.appendChild(row);
+  });
+
+  // Admin: remove buttons
+  if (isAdmin) {
+    opponents.forEach(p => {
+      // Add remove button to player cards
+      const cards = list.querySelectorAll('.player-card');
+      cards.forEach(card => {
+        const nameEl = card.querySelector('.player-name');
+        if (nameEl && nameEl.textContent.includes(p.username) && !nameEl.textContent.includes('you')) {
+          const removeBtn = document.createElement('button');
+          removeBtn.className = 'btn btn-red btn-sm';
+          removeBtn.textContent = '✕';
+          removeBtn.title = 'Remove player';
+          removeBtn.onclick = (e) => {
+            e.stopPropagation();
+            socket.emit('admin_remove_player', {room_code: ROOM_CODE, username: p.username});
+          };
+          card.appendChild(removeBtn);
+        }
+      });
+    });
+  }
+}
+
+function renderBracket(bracket, roundName) {
+  const view = document.getElementById('bracketView');
+  if (!bracket || bracket.length === 0) {
+    view.innerHTML = '<div style="color:var(--muted); font-size:0.78rem;">No matches yet.</div>';
+    return;
+  }
+
+  view.innerHTML = `<div style="font-size:0.7rem; letter-spacing:0.2em; text-transform:uppercase; color:var(--gold); margin-bottom:1rem;">${roundName || 'Current Round'}</div>`;
+
+  bracket.forEach(entry => {
+    const div = document.createElement('div');
+    div.className = 'bracket-match';
+    const winnerW = entry.winner === entry.white;
+    const winnerB = entry.winner === entry.black;
+    const byeMatch = entry.black === 'BYE';
+
+    div.innerHTML = `
+      <div class="bracket-round">${roundName || 'Match'}</div>
+      <div class="bracket-player ${winnerW ? 'winner' : entry.winner ? 'loser' : ''}">
+        <span>⬜ ${entry.white}</span>
+        ${winnerW ? '<span class="winner-crown">♔</span>' : ''}
+      </div>
+      <div class="bracket-player ${winnerB ? 'winner' : entry.winner ? 'loser' : ''}">
+        <span>⬛ ${byeMatch ? 'BYE' : entry.black}</span>
+        ${winnerB ? '<span class="winner-crown">♔</span>' : ''}
+      </div>
+    `;
+    view.appendChild(div);
+  });
+}
+
+// ============= ACTIONS =============
+
+function selectTime(secs, btn) {
+  selectedTime = secs;
+  document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  document.getElementById('customTime').value = '';
+}
+
+function setCustomTime() {
+  const val = parseInt(document.getElementById('customTime').value);
+  if (val >= 30 && val <= 3600) {
+    selectedTime = val;
+    document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('selected'));
+    showToast(`Custom time: ${val} seconds`);
+  } else {
+    showToast('⚠ Custom time must be 30–3600 seconds');
+  }
+}
+
+function challengePlayer(opponent) {
+  socket.emit('send_match_request', {
+    room_code: ROOM_CODE,
+    opponent: opponent,
+    time_control: selectedTime
+  });
+  showToast(`Challenge sent to ${opponent}!`);
+}
+
+function respondRequest(accepted) {
+  if (!pendingRequest) return;
+  socket.emit('respond_match_request', {
+    room_code: ROOM_CODE,
+    requester: pendingRequest.from,
+    accepted: accepted
+  });
+  document.getElementById('requestToast').style.display = 'none';
+  pendingRequest = null;
+}
+
+function startTournament() {
+  const btn = document.getElementById('startBtn');
+  btn.disabled = true;
+  socket.emit('start_tournament', {
+    room_code: ROOM_CODE,
+    time_control: selectedTime
+  });
+}
+
+function forceNextRound() {
+  socket.emit('admin_force_next_round', {room_code: ROOM_CODE});
+}
+
+function sendChat() {
+  const input = document.getElementById('chatInput');
+  const msg = input.value.trim();
+  if (!msg) return;
+  socket.emit('chat_message', {room_code: ROOM_CODE, message: msg});
+  input.value = '';
+}
+
+function addChatMessage(user, text) {
+  const msgs = document.getElementById('chatMessages');
+  const div = document.createElement('div');
+  div.className = 'chat-msg';
+  div.innerHTML = `<span class="author">${user}:</span> <span class="text">${escapeHtml(text)}</span>`;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function copyCode() {
+  navigator.clipboard.writeText(ROOM_CODE);
+  showToast('Room code copied!');
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+let toastTimer;
+function showToast(msg, duration=3000) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.style.display = 'none', duration);
+}
+
+document.getElementById('chatInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') sendChat();
+});
+</script>
+</body>
+</html>

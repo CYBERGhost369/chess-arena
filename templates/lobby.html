@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChessArena — Lobby</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #0d0d0d;
+    --ink2: #111111;
+    --cream: #f5f0e8;
+    --gold: #c9a84c;
+    --gold-light: #e8c97a;
+    --border: rgba(201,168,76,0.2);
+    --muted: rgba(245,240,232,0.4);
+    --panel: rgba(255,255,255,0.03);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--ink);
+    color: var(--cream);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+  }
+
+  nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 2rem;
+    border-bottom: 1px solid var(--border);
+    background: rgba(0,0,0,0.3);
+    backdrop-filter: blur(10px);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .nav-brand {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.4rem;
+    font-weight: 900;
+    background: linear-gradient(135deg, var(--gold-light), var(--gold));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-decoration: none;
+  }
+
+  .nav-right {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+  }
+
+  .nav-user {
+    font-size: 0.75rem;
+    color: var(--muted);
+  }
+
+  .nav-user span {
+    color: var(--gold);
+    font-weight: 500;
+  }
+
+  .btn {
+    padding: 0.5rem 1.2rem;
+    border-radius: 2px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+    text-decoration: none;
+    display: inline-block;
+  }
+
+  .btn-gold {
+    background: var(--gold);
+    color: var(--ink);
+  }
+  .btn-gold:hover { background: var(--gold-light); transform: translateY(-1px); }
+
+  .btn-outline {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+  .btn-outline:hover { border-color: var(--gold); color: var(--gold); }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--muted);
+    font-size: 0.7rem;
+  }
+  .btn-ghost:hover { color: var(--cream); }
+
+  .page {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 2rem;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+  }
+
+  @media (max-width: 700px) {
+    .page { grid-template-columns: 1fr; }
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 2rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .panel::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  }
+
+  .panel-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.3rem;
+    font-weight: 700;
+    margin-bottom: 0.4rem;
+  }
+
+  .panel-sub {
+    color: var(--muted);
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    margin-bottom: 1.8rem;
+  }
+
+  .form-group {
+    margin-bottom: 1.2rem;
+  }
+
+  label {
+    display: block;
+    font-size: 0.68rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 0.5rem;
+  }
+
+  input[type="text"] {
+    width: 100%;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(201,168,76,0.2);
+    border-radius: 2px;
+    padding: 0.75rem 1rem;
+    color: var(--cream);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color 0.2s;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  input:focus { border-color: var(--gold); }
+  input::placeholder { color: rgba(245,240,232,0.2); text-transform: none; }
+
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .stat {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.05);
+    padding: 1rem 0.75rem;
+    border-radius: 2px;
+    text-align: center;
+  }
+
+  .stat-value {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--gold);
+    display: block;
+  }
+
+  .stat-label {
+    font-size: 0.6rem;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-top: 0.25rem;
+    display: block;
+  }
+
+  .elo-badge {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(201,168,76,0.08);
+    border: 1px solid rgba(201,168,76,0.2);
+    padding: 1rem 1.2rem;
+    border-radius: 2px;
+    margin-bottom: 1.5rem;
+  }
+
+  .elo-left .elo-label {
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+  }
+
+  .elo-left .elo-val {
+    font-family: 'Playfair Display', serif;
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--gold);
+  }
+
+  .elo-rank {
+    font-size: 0.7rem;
+    color: var(--muted);
+    text-align: right;
+  }
+
+  .elo-rank span {
+    display: block;
+    font-size: 1.2rem;
+  }
+
+  .error-msg {
+    background: rgba(220,50,50,0.1);
+    border: 1px solid rgba(220,50,50,0.3);
+    color: #ff6b6b;
+    padding: 0.7rem 1rem;
+    border-radius: 2px;
+    font-size: 0.78rem;
+    margin-top: 1rem;
+    display: none;
+  }
+
+  .success-msg {
+    background: rgba(50,200,100,0.1);
+    border: 1px solid rgba(50,200,100,0.3);
+    color: #6bff9b;
+    padding: 0.7rem 1rem;
+    border-radius: 2px;
+    font-size: 0.78rem;
+    margin-top: 1rem;
+    display: none;
+  }
+
+  .full-width {
+    grid-column: 1 / -1;
+  }
+
+  .leaderboard-row {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    gap: 1rem;
+  }
+
+  .leaderboard-row:last-child { border-bottom: none; }
+
+  .lb-rank {
+    font-size: 0.7rem;
+    color: var(--muted);
+    width: 24px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  .lb-rank.top { color: var(--gold); font-weight: 700; }
+
+  .lb-name {
+    flex: 1;
+    font-size: 0.85rem;
+  }
+
+  .lb-elo {
+    color: var(--gold);
+    font-size: 0.8rem;
+    font-weight: 500;
+  }
+
+  .lb-wins {
+    color: var(--muted);
+    font-size: 0.7rem;
+    width: 60px;
+    text-align: right;
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="/lobby" class="nav-brand">♛ ChessArena</a>
+  <div class="nav-right">
+    <div class="nav-user">Playing as <span>{{ user.username }}</span></div>
+    <a href="/leaderboard" class="btn btn-outline">Leaderboard</a>
+    <a href="/logout" class="btn btn-ghost">Logout</a>
+  </div>
+</nav>
+
+<div class="page">
+  <!-- Player Stats -->
+  <div class="panel">
+    <div class="panel-title">Your Profile</div>
+    <div class="panel-sub">CAREER STATISTICS</div>
+
+    <div class="elo-badge">
+      <div class="elo-left">
+        <div class="elo-label">ELO Rating</div>
+        <div class="elo-val">{{ user.elo_rating }}</div>
+      </div>
+      <div class="elo-rank">
+        <span>
+          {% if user.elo_rating >= 2000 %}♔
+          {% elif user.elo_rating >= 1600 %}♕
+          {% elif user.elo_rating >= 1400 %}♖
+          {% elif user.elo_rating >= 1200 %}♗
+          {% else %}♙{% endif %}
+        </span>
+        {% if user.elo_rating >= 2000 %}Master
+        {% elif user.elo_rating >= 1600 %}Expert
+        {% elif user.elo_rating >= 1400 %}Advanced
+        {% elif user.elo_rating >= 1200 %}Intermediate
+        {% else %}Beginner{% endif %}
+      </div>
+    </div>
+
+    <div class="stat-grid">
+      <div class="stat">
+        <span class="stat-value">{{ user.total_matches }}</span>
+        <span class="stat-label">Matches</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value">{{ user.total_wins }}</span>
+        <span class="stat-label">Wins</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value">{{ user.total_losses }}</span>
+        <span class="stat-label">Losses</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value">{{ user.tournaments_played }}</span>
+        <span class="stat-label">Tourneys</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value">{{ user.tournament_wins }}</span>
+        <span class="stat-label">T. Wins</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value">{{ user.total_draws }}</span>
+        <span class="stat-label">Draws</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Room Controls -->
+  <div class="panel">
+    <div class="panel-title">Tournament Room</div>
+    <div class="panel-sub">CREATE OR JOIN A ROOM</div>
+
+    <!-- Create Room -->
+    <div style="margin-bottom: 2rem;">
+      <div style="font-size: 0.7rem; color: var(--gold); letter-spacing:0.2em; text-transform:uppercase; margin-bottom:1rem;">Create New Room</div>
+      <button class="btn btn-gold" onclick="createRoom()" style="width:100%; padding:0.85rem;">
+        ⚔ Create Tournament Room
+      </button>
+    </div>
+
+    <div style="text-align:center; color:var(--muted); font-size:0.7rem; letter-spacing:0.2em; margin-bottom:2rem;">— OR —</div>
+
+    <!-- Join Room -->
+    <div>
+      <div style="font-size: 0.7rem; color: var(--gold); letter-spacing:0.2em; text-transform:uppercase; margin-bottom:1rem;">Join Existing Room</div>
+      <div class="form-group">
+        <input type="text" id="roomCode" placeholder="Enter room code" maxlength="8">
+      </div>
+      <button class="btn btn-outline" onclick="joinRoom()" style="width:100%; padding:0.85rem;">
+        → Join Room
+      </button>
+    </div>
+
+    <div class="error-msg" id="roomError"></div>
+    <div class="success-msg" id="roomSuccess"></div>
+  </div>
+</div>
+
+<script>
+async function createRoom() {
+  const res = await fetch('/api/create_room', { method: 'POST' });
+  const data = await res.json();
+  if (data.error) {
+    showError('roomError', data.error);
+  } else {
+    window.location.href = '/room/' + data.room_code;
+  }
+}
+
+async function joinRoom() {
+  const code = document.getElementById('roomCode').value.trim().toUpperCase();
+  if (!code) { showError('roomError', 'Please enter a room code'); return; }
+  
+  const res = await fetch('/api/join_room', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({room_code: code})
+  });
+  const data = await res.json();
+  if (data.error) {
+    showError('roomError', data.error);
+  } else {
+    window.location.href = '/room/' + data.room_code;
+  }
+}
+
+function showError(id, msg) {
+  const el = document.getElementById(id);
+  el.textContent = '⚠ ' + msg;
+  el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', 4000);
+}
+
+document.getElementById('roomCode').addEventListener('keydown', e => {
+  if (e.key === 'Enter') joinRoom();
+});
+</script>
+</body>
+</html>

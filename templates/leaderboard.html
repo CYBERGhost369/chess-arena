@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChessArena — Leaderboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #0d0d0d;
+    --cream: #f5f0e8;
+    --gold: #c9a84c;
+    --gold-light: #e8c97a;
+    --border: rgba(201,168,76,0.2);
+    --muted: rgba(245,240,232,0.4);
+    --panel: rgba(255,255,255,0.03);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--ink);
+    color: var(--cream);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+  }
+
+  nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 2rem;
+    border-bottom: 1px solid var(--border);
+    background: rgba(0,0,0,0.4);
+    backdrop-filter: blur(10px);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .nav-brand {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.3rem;
+    font-weight: 900;
+    background: linear-gradient(135deg, var(--gold-light), var(--gold));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-decoration: none;
+  }
+
+  .btn {
+    padding: 0.5rem 1.2rem;
+    border-radius: 2px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    text-decoration: none;
+    display: inline-block;
+  }
+  .btn:hover { border-color: var(--gold); color: var(--gold); }
+
+  .page {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 3rem 2rem;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+  }
+
+  @media (max-width: 700px) { .page { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .panel::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  }
+
+  .panel-header {
+    padding: 1.5rem 2rem 1rem;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+
+  .panel-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.3rem;
+    font-weight: 700;
+  }
+
+  .panel-sub {
+    color: var(--muted);
+    font-size: 0.68rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-top: 0.25rem;
+  }
+
+  /* Leaderboard table */
+  .lb-table {
+    width: 100%;
+  }
+
+  .lb-row {
+    display: grid;
+    grid-template-columns: 40px 1fr 80px 80px 80px;
+    align-items: center;
+    padding: 0.85rem 2rem;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    transition: background 0.2s;
+    gap: 0.5rem;
+  }
+
+  .lb-row:hover { background: rgba(255,255,255,0.02); }
+
+  .lb-row.header {
+    font-size: 0.62rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 0.6rem 2rem;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+
+  .lb-rank {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--muted);
+  }
+
+  .lb-rank.rank-1 { color: #FFD700; }
+  .lb-rank.rank-2 { color: #C0C0C0; }
+  .lb-rank.rank-3 { color: #CD7F32; }
+
+  .lb-name {
+    font-size: 0.88rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .lb-name .crown {
+    font-size: 0.75rem;
+  }
+
+  .lb-elo {
+    font-family: 'Playfair Display', serif;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--gold);
+    text-align: right;
+  }
+
+  .lb-stat {
+    text-align: right;
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+
+  .lb-stat.wins { color: #4caf7d; }
+
+  /* Tournament history */
+  .tourney-row {
+    padding: 1.2rem 2rem;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    transition: background 0.2s;
+  }
+
+  .tourney-row:hover { background: rgba(255,255,255,0.02); }
+
+  .tourney-row:last-child { border-bottom: none; }
+
+  .tourney-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+  }
+
+  .tourney-id {
+    font-size: 0.75rem;
+    color: var(--muted);
+  }
+
+  .tourney-date {
+    font-size: 0.68rem;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+  }
+
+  .tourney-winner {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+  }
+
+  .winner-trophy { color: var(--gold); }
+
+  .tourney-players {
+    font-size: 0.7rem;
+    color: var(--muted);
+    margin-top: 0.3rem;
+  }
+
+  .empty-state {
+    padding: 3rem 2rem;
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.8rem;
+  }
+
+  .empty-state .icon { font-size: 2.5rem; display: block; margin-bottom: 1rem; }
+
+  .page-hero {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 1rem 0 2rem;
+  }
+
+  .page-hero h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 3rem;
+    font-weight: 900;
+    background: linear-gradient(135deg, var(--gold-light), var(--gold), #8B6914);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .page-hero p {
+    color: var(--muted);
+    font-size: 0.8rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-top: 0.5rem;
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="/lobby" class="nav-brand">♛ ChessArena</a>
+  <div style="display:flex; gap:1rem;">
+    <a href="/lobby" class="btn">← Lobby</a>
+    <a href="/logout" class="btn">Logout</a>
+  </div>
+</nav>
+
+<div class="page">
+  <div class="page-hero">
+    <h1>🏆 Leaderboard</h1>
+    <p>Global Rankings & Tournament History</p>
+  </div>
+
+  <!-- ELO Rankings -->
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-title">ELO Rankings</div>
+      <div class="panel-sub">Top players by rating</div>
+    </div>
+    
+    {% if users %}
+    <div class="lb-table">
+      <div class="lb-row header">
+        <span>#</span>
+        <span>Player</span>
+        <span style="text-align:right">ELO</span>
+        <span style="text-align:right">Wins</span>
+        <span style="text-align:right">Matches</span>
+      </div>
+      {% for user in users %}
+      <div class="lb-row">
+        <div class="lb-rank {% if loop.index == 1 %}rank-1{% elif loop.index == 2 %}rank-2{% elif loop.index == 3 %}rank-3{% endif %}">
+          {% if loop.index == 1 %}♔
+          {% elif loop.index == 2 %}♕
+          {% elif loop.index == 3 %}♖
+          {% else %}{{ loop.index }}{% endif %}
+        </div>
+        <div class="lb-name">
+          {{ user.username }}
+          {% if user.tournament_wins > 0 %}
+          <span class="crown" title="{{ user.tournament_wins }} tournament win(s)">🏆</span>
+          {% endif %}
+        </div>
+        <div class="lb-elo">{{ user.elo_rating }}</div>
+        <div class="lb-stat wins">{{ user.total_wins }}</div>
+        <div class="lb-stat">{{ user.total_matches }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <span class="icon">♟</span>
+      No players yet. Be the first!
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Tournament History -->
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-title">Tournament History</div>
+      <div class="panel-sub">Past completed tournaments</div>
+    </div>
+
+    {% if tournaments %}
+    {% for t in tournaments %}
+    <div class="tourney-row">
+      <div class="tourney-header">
+        <div class="tourney-id">Tournament #{{ t.id }} · {{ t.room_code }}</div>
+        <div class="tourney-date">
+          {{ t.completed_at.strftime('%b %d, %Y') if t.completed_at else 'N/A' }}
+        </div>
+      </div>
+      <div class="tourney-winner">
+        <span class="winner-trophy">♔</span>
+        <strong>{{ t.winner_username or 'N/A' }}</strong>
+      </div>
+      <div class="tourney-players">
+        {{ t.participants | length }} players · Admin: {{ t.admin_username }}
+      </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="empty-state">
+      <span class="icon">🏆</span>
+      No completed tournaments yet.
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChessArena — Login</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #0d0d0d;
+    --cream: #f5f0e8;
+    --gold: #c9a84c;
+    --gold-light: #e8c97a;
+    --dark-square: #1a1410;
+    --light-square: #2a2218;
+    --border: rgba(201,168,76,0.3);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  
+  body {
+    background: var(--ink);
+    color: var(--cream);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* Chessboard background */
+  .chess-bg {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    grid-template-rows: repeat(8, 1fr);
+    opacity: 0.06;
+    pointer-events: none;
+    z-index: 0;
+    transform: rotate(-15deg) scale(1.5);
+  }
+  .chess-bg div:nth-child(odd) { background: var(--cream); }
+  .chess-bg div:nth-child(even) { background: transparent; }
+  .chess-bg .row:nth-child(even) div:nth-child(odd) { background: transparent; }
+  .chess-bg .row:nth-child(even) div:nth-child(even) { background: var(--cream); }
+
+  /* Floating chess pieces */
+  .piece-float {
+    position: fixed;
+    font-size: 6rem;
+    opacity: 0.04;
+    pointer-events: none;
+    z-index: 0;
+    animation: floatPiece 20s ease-in-out infinite;
+  }
+  .piece-float:nth-child(1) { top: 10%; left: 5%; animation-delay: 0s; }
+  .piece-float:nth-child(2) { top: 60%; left: 85%; animation-delay: -5s; }
+  .piece-float:nth-child(3) { top: 80%; left: 15%; animation-delay: -10s; }
+  .piece-float:nth-child(4) { top: 20%; left: 75%; animation-delay: -15s; }
+
+  @keyframes floatPiece {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    33% { transform: translateY(-20px) rotate(5deg); }
+    66% { transform: translateY(10px) rotate(-3deg); }
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 420px;
+    padding: 2rem;
+  }
+
+  .logo {
+    text-align: center;
+    margin-bottom: 3rem;
+  }
+
+  .logo-crown {
+    font-size: 3.5rem;
+    display: block;
+    margin-bottom: 0.5rem;
+    animation: crownPulse 3s ease-in-out infinite;
+  }
+
+  @keyframes crownPulse {
+    0%, 100% { transform: scale(1); filter: drop-shadow(0 0 10px rgba(201,168,76,0.3)); }
+    50% { transform: scale(1.05); filter: drop-shadow(0 0 25px rgba(201,168,76,0.7)); }
+  }
+
+  .logo h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 3rem;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    background: linear-gradient(135deg, var(--gold-light), var(--gold), #8B6914);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .logo p {
+    color: rgba(245,240,232,0.4);
+    font-size: 0.75rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    margin-top: 0.5rem;
+  }
+
+  .card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 2.5rem;
+    backdrop-filter: blur(10px);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  }
+
+  .card-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.3rem;
+    color: var(--cream);
+    margin-bottom: 0.5rem;
+    font-weight: 700;
+  }
+
+  .card-sub {
+    color: rgba(245,240,232,0.4);
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    margin-bottom: 2rem;
+  }
+
+  .form-group {
+    margin-bottom: 1.5rem;
+  }
+
+  label {
+    display: block;
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 0.6rem;
+  }
+
+  input[type="text"] {
+    width: 100%;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(201,168,76,0.2);
+    border-radius: 2px;
+    padding: 0.85rem 1rem;
+    color: var(--cream);
+    font-family: 'DM Mono', monospace;
+    font-size: 1rem;
+    outline: none;
+    transition: border-color 0.2s, background 0.2s;
+  }
+
+  input[type="text"]:focus {
+    border-color: var(--gold);
+    background: rgba(201,168,76,0.05);
+  }
+
+  input[type="text"]::placeholder {
+    color: rgba(245,240,232,0.2);
+  }
+
+  .btn-primary {
+    width: 100%;
+    background: var(--gold);
+    color: var(--ink);
+    border: none;
+    padding: 1rem;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.85rem;
+    font-weight: 500;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn-primary::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(255,255,255,0);
+    transition: background 0.2s;
+  }
+
+  .btn-primary:hover {
+    background: var(--gold-light);
+    transform: translateY(-1px);
+    box-shadow: 0 8px 30px rgba(201,168,76,0.3);
+  }
+
+  .btn-primary:active {
+    transform: translateY(0);
+  }
+
+  .error {
+    background: rgba(220,50,50,0.1);
+    border: 1px solid rgba(220,50,50,0.3);
+    color: #ff6b6b;
+    padding: 0.75rem 1rem;
+    border-radius: 2px;
+    font-size: 0.8rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .divider {
+    text-align: center;
+    color: rgba(245,240,232,0.2);
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    margin: 1.5rem 0;
+  }
+
+  .features {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    margin-top: 2rem;
+  }
+
+  .feature {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.05);
+    padding: 0.75rem;
+    border-radius: 2px;
+    text-align: center;
+  }
+
+  .feature-icon { font-size: 1.2rem; display: block; margin-bottom: 0.3rem; }
+  .feature-text { font-size: 0.65rem; color: rgba(245,240,232,0.4); letter-spacing: 0.05em; }
+</style>
+</head>
+<body>
+
+<div class="piece-float">♔</div>
+<div class="piece-float">♛</div>
+<div class="piece-float">♜</div>
+<div class="piece-float">♝</div>
+
+<div class="container">
+  <div class="logo">
+    <span class="logo-crown">♛</span>
+    <h1>ChessArena</h1>
+    <p>Online Tournament Platform</p>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Enter the Arena</div>
+    <div class="card-sub">No registration required · Just your name</div>
+
+    {% if error %}
+    <div class="error">⚠ {{ error }}</div>
+    {% endif %}
+
+    <form method="POST" action="/login">
+      <div class="form-group">
+        <label for="username">Your Username</label>
+        <input type="text" id="username" name="username" 
+               placeholder="e.g. GrandMaster42" 
+               maxlength="30" autocomplete="off" autofocus required>
+      </div>
+      <button type="submit" class="btn-primary">⚔ Enter Arena</button>
+    </form>
+
+    <div class="divider">— platform features —</div>
+
+    <div class="features">
+      <div class="feature">
+        <span class="feature-icon">🏆</span>
+        <div class="feature-text">Tournament Brackets</div>
+      </div>
+      <div class="feature">
+        <span class="feature-icon">⚡</span>
+        <div class="feature-text">Real-time Matches</div>
+      </div>
+      <div class="feature">
+        <span class="feature-icon">⏱</span>
+        <div class="feature-text">Chess Clock</div>
+      </div>
+      <div class="feature">
+        <span class="feature-icon">📊</span>
+        <div class="feature-text">ELO Rating</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

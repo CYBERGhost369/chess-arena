@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChessArena — Match</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+
+<!-- Chess.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+
+<!-- Chessboard.js -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
+
+<!-- Socket.IO -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+
+<style>
+  :root {
+    --ink: #0d0d0d;
+    --cream: #f5f0e8;
+    --gold: #c9a84c;
+    --gold-light: #e8c97a;
+    --green: #4caf7d;
+    --red: #e05757;
+    --border: rgba(201,168,76,0.2);
+    --muted: rgba(245,240,232,0.4);
+    --panel: rgba(255,255,255,0.03);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: #0a0a0a;
+    color: var(--cream);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    background: rgba(0,0,0,0.5);
+    backdrop-filter: blur(10px);
+  }
+
+  .nav-brand {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.1rem;
+    font-weight: 900;
+    background: linear-gradient(135deg, var(--gold-light), var(--gold));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-decoration: none;
+  }
+
+  .match-layout {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 280px 1fr 280px;
+    gap: 0;
+    overflow: hidden;
+  }
+
+  @media (max-width: 900px) {
+    .match-layout { grid-template-columns: 1fr; }
+    .left-panel, .right-panel { max-height: 200px; }
+  }
+
+  .left-panel, .right-panel {
+    padding: 1.5rem;
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .right-panel {
+    border-right: none;
+    border-left: 1px solid var(--border);
+  }
+
+  .center-board {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 1rem;
+    gap: 0.75rem;
+  }
+
+  /* Player info strips */
+  .player-strip {
+    width: 100%;
+    max-width: 560px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 2px;
+    gap: 1rem;
+  }
+
+  .player-strip.active-player {
+    border-color: var(--gold);
+    background: rgba(201,168,76,0.07);
+  }
+
+  .player-left {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .piece-icon {
+    font-size: 1.5rem;
+  }
+
+  .player-deets { }
+  .player-deets .name {
+    font-size: 0.9rem;
+    font-weight: 500;
+  }
+  .player-deets .color-label {
+    font-size: 0.65rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  /* Chess clock */
+  .clock {
+    font-family: 'Playfair Display', serif;
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    min-width: 100px;
+    text-align: right;
+    transition: color 0.3s;
+  }
+
+  .clock.danger { color: var(--red); animation: clockBlink 1s ease infinite; }
+  .clock.warning { color: #e8a84c; }
+  .clock.normal { color: var(--cream); }
+
+  @keyframes clockBlink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  /* Board container */
+  #board-container {
+    position: relative;
+  }
+
+  /* Override chessboard.js styling */
+  .board-b72b1 {
+    border: 3px solid var(--gold) !important;
+    border-radius: 2px !important;
+    box-shadow: 0 0 60px rgba(201,168,76,0.15), 0 0 120px rgba(0,0,0,0.5) !important;
+  }
+
+  /* Status bar */
+  .status-bar {
+    width: 100%;
+    max-width: 560px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1rem;
+    background: rgba(0,0,0,0.4);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 2px;
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+  }
+
+  /* Game Over Overlay */
+  .game-over-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    display: none;
+  }
+
+  .game-over-card {
+    background: #13110d;
+    border: 2px solid var(--gold);
+    padding: 3rem 4rem;
+    border-radius: 2px;
+    text-align: center;
+    position: relative;
+    max-width: 500px;
+    width: 90%;
+  }
+
+  .game-over-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  }
+
+  .game-over-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    display: block;
+  }
+
+  .game-over-result {
+    font-family: 'Playfair Display', serif;
+    font-size: 2.5rem;
+    font-weight: 900;
+    margin-bottom: 0.5rem;
+  }
+
+  .game-over-sub {
+    color: var(--muted);
+    font-size: 0.85rem;
+    margin-bottom: 2rem;
+  }
+
+  .go-btns {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+  }
+
+  .btn {
+    padding: 0.7rem 1.5rem;
+    border-radius: 2px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.8rem;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+    text-transform: uppercase;
+    text-decoration: none;
+    display: inline-block;
+  }
+
+  .btn-gold { background: var(--gold); color: var(--ink); }
+  .btn-gold:hover { background: var(--gold-light); }
+  .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+  .btn-outline:hover { border-color: var(--gold); color: var(--gold); }
+  .btn-red { background: rgba(224,87,87,0.15); border: 1px solid rgba(224,87,87,0.3); color: var(--red); }
+  .btn-red:hover { background: rgba(224,87,87,0.25); }
+
+  /* Move history */
+  .move-list {
+    font-size: 0.78rem;
+    max-height: 300px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .move-pair {
+    display: grid;
+    grid-template-columns: 30px 1fr 1fr;
+    gap: 0.5rem;
+    padding: 0.35rem 0.5rem;
+    border-radius: 2px;
+  }
+
+  .move-pair:nth-child(odd) {
+    background: rgba(255,255,255,0.03);
+  }
+
+  .move-num { color: var(--muted); font-size: 0.7rem; }
+  .move-w, .move-b { font-weight: 400; }
+  .move-w:last-of-type, .move-b:last-of-type { color: var(--gold); }
+
+  .panel-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--gold);
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* Captured pieces */
+  .captured-pieces {
+    font-size: 1rem;
+    letter-spacing: -0.05em;
+    min-height: 1.5rem;
+    color: var(--muted);
+  }
+
+  .resign-row {
+    margin-top: auto;
+    padding-top: 1rem;
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="/lobby" class="nav-brand">♛ ChessArena</a>
+  <div style="font-size:0.75rem; color:var(--muted);">
+    Match #{{ match.id }} · {{ match.round_name }}
+  </div>
+  <div style="font-size:0.75rem; color:var(--muted);">{{ username }}</div>
+</nav>
+
+<div class="match-layout">
+  <!-- Left Panel -->
+  <div class="left-panel">
+    <div>
+      <div class="panel-title">Move History</div>
+      <div class="move-list" id="moveList">
+        <div style="color:var(--muted); font-size:0.75rem;">No moves yet.</div>
+      </div>
+    </div>
+    <div class="resign-row">
+      <button class="btn btn-red" style="width:100%;" onclick="resign()">🏳 Resign</button>
+    </div>
+  </div>
+
+  <!-- Center Board -->
+  <div class="center-board">
+    <!-- Opponent (top) -->
+    <div class="player-strip" id="opponentStrip">
+      <div class="player-left">
+        <div class="piece-icon" id="opponentIcon">♟</div>
+        <div class="player-deets">
+          <div class="name" id="opponentName">—</div>
+          <div class="color-label" id="opponentColor">—</div>
+        </div>
+      </div>
+      <div class="clock" id="opponentClock">—:——</div>
+    </div>
+
+    <!-- Captured pieces (opponent's captures) -->
+    <div id="capturedByOpponent" class="captured-pieces" style="width:100%; max-width:560px; padding:0 0.5rem;"></div>
+
+    <!-- Board -->
+    <div id="board-container">
+      <div id="board" style="width:min(500px, calc(100vw - 40px))"></div>
+    </div>
+
+    <!-- Captured pieces (my captures) -->
+    <div id="capturedByMe" class="captured-pieces" style="width:100%; max-width:560px; padding:0 0.5rem;"></div>
+
+    <!-- Me (bottom) -->
+    <div class="player-strip" id="myStrip">
+      <div class="player-left">
+        <div class="piece-icon" id="myIcon">♙</div>
+        <div class="player-deets">
+          <div class="name" id="myName">—</div>
+          <div class="color-label" id="myColor">—</div>
+        </div>
+      </div>
+      <div class="clock" id="myClock">—:——</div>
+    </div>
+
+    <!-- Status -->
+    <div class="status-bar" id="statusBar">
+      <div class="status-dot"></div>
+      <span id="statusText">Connecting...</span>
+    </div>
+  </div>
+
+  <!-- Right Panel -->
+  <div class="right-panel">
+    <div>
+      <div class="panel-title">Game Info</div>
+      <div style="display:flex; flex-direction:column; gap:0.5rem; font-size:0.78rem; color:var(--muted);">
+        <div>Round: <span style="color:var(--cream);">{{ match.round_name }}</span></div>
+        <div>Time: <span style="color:var(--cream);" id="timeControlLabel">—</span></div>
+        <div>Status: <span style="color:var(--cream);" id="gameStatus">Active</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Game Over Overlay -->
+<div class="game-over-overlay" id="gameOverOverlay">
+  <div class="game-over-card">
+    <span class="game-over-icon" id="goIcon">♔</span>
+    <div class="game-over-result" id="goResult">—</div>
+    <div class="game-over-sub" id="goSub">—</div>
+    <div class="go-btns">
+      <a href="/lobby" class="btn btn-gold">← Lobby</a>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== MATCH DATA =====
+const MATCH_ID = {{ match.id }};
+const ME = '{{ username }}';
+const WHITE_PLAYER = '{{ match.white_player }}';
+const BLACK_PLAYER = '{{ match.black_player }}';
+const TIME_CONTROL = {{ match.time_control }};
+
+// My color
+const MY_COLOR = (ME === WHITE_PLAYER) ? 'white' : 'black';
+const OPP_COLOR = MY_COLOR === 'white' ? 'black' : 'white';
+const OPPONENT = MY_COLOR === 'white' ? BLACK_PLAYER : WHITE_PLAYER;
+
+// ===== STATE =====
+let game = new Chess();
+let board;
+let whiteTime = TIME_CONTROL;
+let blackTime = TIME_CONTROL;
+let timerInterval = null;
+let gameActive = true;
+let moveHistory = [];
+let capturedWhite = []; // captured from white (black's captures)
+let capturedBlack = []; // captured from black (white's captures)
+
+const socket = io();
+
+// ===== SETUP UI =====
+document.getElementById('myName').textContent = ME;
+document.getElementById('opponentName').textContent = OPPONENT;
+document.getElementById('myColor').textContent = MY_COLOR;
+document.getElementById('opponentColor').textContent = OPP_COLOR;
+document.getElementById('myIcon').textContent = MY_COLOR === 'white' ? '♙' : '♟';
+document.getElementById('opponentIcon').textContent = OPP_COLOR === 'white' ? '♙' : '♟';
+
+const mins = Math.floor(TIME_CONTROL / 60);
+const secs = TIME_CONTROL % 60;
+document.getElementById('timeControlLabel').textContent = secs ? `${mins}m ${secs}s` : `${mins} min`;
+
+// ===== BOARD =====
+function initBoard() {
+  board = Chessboard('board', {
+    position: 'start',
+    orientation: MY_COLOR,
+    draggable: true,
+    pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png',
+    onDragStart: onDragStart,
+    onDrop: onDrop,
+    onSnapEnd: onSnapEnd
+  });
+}
+
+function onDragStart(source, piece) {
+  if (!gameActive) return false;
+  if (game.game_over()) return false;
+  
+  // Only move your own pieces
+  if (MY_COLOR === 'white' && piece.search(/^b/) !== -1) return false;
+  if (MY_COLOR === 'black' && piece.search(/^w/) !== -1) return false;
+  
+  // Only move on your turn
+  if (game.turn() !== MY_COLOR[0]) return false;
+  
+  return true;
+}
+
+function onDrop(source, target) {
+  const move = game.move({
+    from: source,
+    to: target,
+    promotion: 'q' // always promote to queen
+  });
+
+  if (move === null) return 'snapback';
+
+  // Valid move — emit to server
+  socket.emit('make_move', {
+    match_id: MATCH_ID,
+    move: { from: source, to: target, promotion: move.promotion || null },
+    fen: game.fen()
+  });
+
+  updateMoveHistory();
+  updateCaptured(move);
+  checkGameOver();
+  updateStatus();
+  
+  // Switch timer
+  switchTimer();
+}
+
+function onSnapEnd() {
+  board.position(game.fen());
+}
+
+// ===== TIMER =====
+function formatTime(secs) {
+  if (secs < 0) secs = 0;
+  const m = Math.floor(secs / 60);
+  const s = Math.floor(secs % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+function updateClockDisplay() {
+  const myTime = MY_COLOR === 'white' ? whiteTime : blackTime;
+  const oppTime = MY_COLOR === 'white' ? blackTime : whiteTime;
+
+  document.getElementById('myClock').textContent = formatTime(myTime);
+  document.getElementById('opponentClock').textContent = formatTime(oppTime);
+
+  // Update clock urgency classes
+  const myEl = document.getElementById('myClock');
+  const oppEl = document.getElementById('opponentClock');
+
+  ['danger','warning','normal'].forEach(c => {
+    myEl.classList.remove(c);
+    oppEl.classList.remove(c);
+  });
+
+  myEl.classList.add(myTime < 10 ? 'danger' : myTime < 30 ? 'warning' : 'normal');
+  oppEl.classList.add(oppTime < 10 ? 'danger' : oppTime < 30 ? 'warning' : 'normal');
+
+  // Active player highlight
+  const myTurn = game.turn() === MY_COLOR[0];
+  document.getElementById('myStrip').classList.toggle('active-player', myTurn);
+  document.getElementById('opponentStrip').classList.toggle('active-player', !myTurn);
+}
+
+function startTimer() {
+  if (timerInterval) clearInterval(timerInterval);
+  
+  timerInterval = setInterval(() => {
+    if (!gameActive) {
+      clearInterval(timerInterval);
+      return;
+    }
+    
+    const turn = game.turn();
+    if (turn === 'w') whiteTime -= 1;
+    else blackTime -= 1;
+    
+    updateClockDisplay();
+    
+    // White player is authoritative for timer updates
+    if (ME === WHITE_PLAYER) {
+      socket.emit('update_timer', {
+        match_id: MATCH_ID,
+        white_time: whiteTime,
+        black_time: blackTime
+      });
+    }
+    
+    // Check timeout
+    if (whiteTime <= 0) {
+      clearInterval(timerInterval);
+      handleGameOver(BLACK_PLAYER, 'timeout');
+    } else if (blackTime <= 0) {
+      clearInterval(timerInterval);
+      handleGameOver(WHITE_PLAYER, 'timeout');
+    }
+  }, 1000);
+}
+
+function switchTimer() {
+  // Timer switching is handled by interval checking game.turn()
+  updateClockDisplay();
+}
+
+// ===== GAME LOGIC =====
+function checkGameOver() {
+  if (game.in_checkmate()) {
+    const winner = game.turn() === 'w' ? BLACK_PLAYER : WHITE_PLAYER;
+    socket.emit('game_over', { match_id: MATCH_ID, result: 'checkmate', winner });
+    handleGameOver(winner, 'checkmate');
+  } else if (game.in_draw() || game.in_stalemate() || game.in_threefold_repetition() || game.insufficient_material()) {
+    socket.emit('game_over', { match_id: MATCH_ID, result: 'draw', winner: null });
+    handleGameOver(null, 'draw');
+  }
+}
+
+function handleGameOver(winner, result, fromServer=false) {
+  if (!gameActive) return;
+  gameActive = false;
+  clearInterval(timerInterval);
+  
+  const overlay = document.getElementById('gameOverOverlay');
+  const icon = document.getElementById('goIcon');
+  const resultEl = document.getElementById('goResult');
+  const sub = document.getElementById('goSub');
+  
+  if (result === 'draw') {
+    icon.textContent = '🤝';
+    resultEl.textContent = 'Draw!';
+    sub.textContent = 'The game ends in a draw.';
+    resultEl.style.color = 'var(--muted)';
+  } else if (winner === ME) {
+    icon.textContent = '🏆';
+    resultEl.textContent = 'You Win!';
+    resultEl.style.color = 'var(--gold)';
+    sub.textContent = `Victory by ${result}`;
+  } else {
+    icon.textContent = '♟';
+    resultEl.textContent = 'You Lose';
+    resultEl.style.color = 'var(--red)';
+    sub.textContent = `${winner || 'Opponent'} wins by ${result}`;
+  }
+  
+  overlay.style.display = 'flex';
+  document.getElementById('gameStatus').textContent = 'Finished';
+}
+
+function resign() {
+  if (!gameActive) return;
+  if (!confirm('Are you sure you want to resign?')) return;
+  socket.emit('resign', { match_id: MATCH_ID });
+}
+
+// ===== MOVE HISTORY =====
+function updateMoveHistory() {
+  const history = game.history();
+  const list = document.getElementById('moveList');
+  
+  if (history.length === 0) {
+    list.innerHTML = '<div style="color:var(--muted); font-size:0.75rem;">No moves yet.</div>';
+    return;
+  }
+
+  let html = '';
+  for (let i = 0; i < history.length; i += 2) {
+    const moveNum = Math.floor(i / 2) + 1;
+    const wMove = history[i] || '';
+    const bMove = history[i+1] || '';
+    html += `<div class="move-pair">
+      <span class="move-num">${moveNum}.</span>
+      <span class="move-w">${wMove}</span>
+      <span class="move-b">${bMove}</span>
+    </div>`;
+  }
+  list.innerHTML = html;
+  list.scrollTop = list.scrollHeight;
+}
+
+function updateCaptured(move) {
+  if (move.captured) {
+    const piece = move.captured;
+    const pieceMap = { p: '♟', n: '♞', b: '♝', r: '♜', q: '♛' };
+    const symbol = pieceMap[piece] || '';
+    if (move.color === 'w') {
+      capturedBlack.push(symbol);
+    } else {
+      capturedWhite.push(symbol);
+    }
+  }
+  
+  // My captures (opponent pieces I took)
+  const myCaptures = MY_COLOR === 'white' ? capturedBlack : capturedWhite;
+  const oppCaptures = MY_COLOR === 'white' ? capturedWhite : capturedBlack;
+  
+  document.getElementById('capturedByMe').textContent = myCaptures.join('');
+  document.getElementById('capturedByOpponent').textContent = oppCaptures.join('');
+}
+
+function updateStatus() {
+  const turn = game.turn();
+  const myTurn = turn === MY_COLOR[0];
+  let statusText = myTurn ? 'Your turn' : `${OPPONENT}'s turn`;
+  if (game.in_check()) statusText += ' · CHECK!';
+  document.getElementById('statusText').textContent = statusText;
+}
+
+// ===== SOCKET EVENTS =====
+socket.on('connect', () => {
+  socket.emit('join_match', { match_id: MATCH_ID });
+});
+
+socket.on('match_state', (data) => {
+  if (data.fen && data.fen !== game.fen()) {
+    game.load(data.fen);
+    board.position(data.fen);
+  }
+  whiteTime = data.white_time;
+  blackTime = data.black_time;
+  updateClockDisplay();
+  updateStatus();
+  
+  if (data.status === 'active') {
+    startTimer();
+  }
+});
+
+socket.on('move_made', (data) => {
+  // Only update if it's not our own move
+  if (data.by !== ME) {
+    game.move({ from: data.move.from, to: data.move.to, promotion: data.move.promotion || 'q' });
+    board.position(data.fen);
+    
+    // Update captured from move history
+    const history = game.history({ verbose: true });
+    const lastMove = history[history.length - 1];
+    if (lastMove) updateCaptured(lastMove);
+    
+    updateMoveHistory();
+    checkGameOver();
+    updateStatus();
+  }
+  
+  // Update timers from server
+  whiteTime = data.white_time;
+  blackTime = data.black_time;
+  updateClockDisplay();
+});
+
+socket.on('timer_update', (data) => {
+  // Only non-white players update from server
+  if (ME !== WHITE_PLAYER) {
+    whiteTime = data.white_time;
+    blackTime = data.black_time;
+    updateClockDisplay();
+  }
+});
+
+socket.on('game_ended', (data) => {
+  handleGameOver(data.winner, data.result, true);
+});
+
+socket.on('error', (data) => {
+  console.error('Socket error:', data.message);
+});
+
+// ===== INIT =====
+$(document).ready(() => {
+  initBoard();
+  updateClockDisplay();
+  updateStatus();
+  startTimer();
+});
+</script>
+</body>
+</html>
