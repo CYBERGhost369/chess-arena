@@ -17,7 +17,7 @@ db.init_app(app)
 socketio = SocketIO(
     app,
     cors_allowed_origins="*",
-    async_mode='gevent',
+    async_mode='threading',
     ping_timeout=60,
     ping_interval=25,
     max_http_buffer_size=1e6,
