@@ -9,8 +9,22 @@ from flask_socketio import SocketIO, emit, join_room, leave_room
 from models import db, User, Tournament, Match
 
 app = Flask(__name__)
+
+
+def get_database_uri():
+    """Return a SQLAlchemy-compatible database URI for local and Render environments."""
+    database_url = os.environ.get('DATABASE_URL')
+    if not database_url:
+        return 'sqlite:///database.db'
+
+    # Render/Postgres URLs are often exported as postgres://, but SQLAlchemy expects postgresql://
+    if database_url.startswith('postgres://'):
+        return database_url.replace('postgres://', 'postgresql://', 1)
+    return database_url
+
+
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'chess-tournament-secret-key-change-in-prod')
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///database.db')
+app.config['SQLALCHEMY_DATABASE_URI'] = get_database_uri()
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db.init_app(app)
